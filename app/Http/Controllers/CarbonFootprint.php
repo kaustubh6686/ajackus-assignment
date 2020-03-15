@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\CarbonFootprintCache;
+use App\Http\Resources\CarbonFootprintResource;
 use Illuminate\Http\Request;
 use GuzzleHttp\Client;
 
@@ -104,7 +105,7 @@ class CarbonFootprint extends Controller
         return $cache;
     }
 
-    private function saveNewResponseToCache(array $data, float $result):bool {
+    private function saveNewResponseToCache(array $data, float $result) {
         $columns = [];
         foreach( $data as $key => $value ) {
             $columns[$this->association[$key]] = $value;
@@ -112,7 +113,7 @@ class CarbonFootprint extends Controller
         $columns['carbon_footprint'] = $result;
         $carbonFootprint = CarbonFootprintCache::create($columns);
         if ( $carbonFootprint->save() ) {
-            return true;
+            return $carbonFootprint;
         }
         return false;
     }
@@ -127,10 +128,7 @@ class CarbonFootprint extends Controller
 
         $cache = $this->checkCarbonFootprintCache($data);
         if ( $cache ) {
-            $output = [];
-            $output['carbonFootprint'] = $cache->carbon_footprint;
-            $output['cached'] = true;
-            return response()->json($output);
+            return response()->json(new CarbonFootprintResource($cache, true));
         }
 
         $carbonFootprintApiUrl = $this->buildCarbonFootprintApiUrl($data);
@@ -141,9 +139,10 @@ class CarbonFootprint extends Controller
         if ( (int) $response->getStatusCode() === 200 ) {
             $responseBody = json_decode($response->getBody());
             if ( isset($responseBody->carbonFootprint) ) {
-                $this->saveNewResponseToCache($data, (float)$responseBody->carbonFootprint);
-                $responseBody->cached = false;
-                return response()->json($responseBody, $response->getStatusCode());
+                $savedRecord = $this->saveNewResponseToCache($data, (float)$responseBody->carbonFootprint);
+                if ($savedRecord) {
+                    return response()->json(new CarbonFootprintResource($savedRecord, false), $response->getStatusCode());
+                }
             }
         }
         
