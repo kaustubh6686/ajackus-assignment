@@ -8,6 +8,7 @@ use GuzzleHttp\Client;
 
 class CarbonFootprint extends Controller
 {
+    private $apiToken = "4922f4bb62b02a24e1d310432dc8342337e0bb2c";
     private $association = [
         "activity" => 'activity',
         "activityType" => "activity_type",
@@ -31,7 +32,7 @@ class CarbonFootprint extends Controller
                 $url .= "{$key}={$value}&";
             }
         }
-        $url = rtrim($url, '&');
+        $url .= "appTkn={$this->apiToken}";
         return $url;
     }
 
