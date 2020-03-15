@@ -147,7 +147,7 @@ class CarbonFootprint extends Controller
         }
         
         // This will be only excuted if there is any kind of error
-        return response()->json(json_decode($response->getBody()), $response->getStatusCode());
+        return response()->json(json_decode($response->getBody()), $response->getStatusCode()); 
     }
 }
 
