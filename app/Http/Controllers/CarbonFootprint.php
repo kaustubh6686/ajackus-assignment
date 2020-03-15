@@ -2,11 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\CarbonFootprintCache;
 use Illuminate\Http\Request;
 use GuzzleHttp\Client;
 
 class CarbonFootprint extends Controller
 {
+    private $association = [
+        "activity" => 'activity',
+        "activityType" => "activity_type",
+        "fuelType" => "fuel_type",
+        "mode" => "mode",
+        "country" => "country",
+        "carbonFootprint" => "carbon_footprint",
+    ];
 
     private function returnError(string $message) {
         $output = (object)[];
@@ -26,7 +35,7 @@ class CarbonFootprint extends Controller
         return $url;
     }
 
-    private function validateRequestParameters(Request $request):array {
+    private function validateRequestParameters(Request $request) {
         // Activity validation
         $activity = (float) $request->input('activity', false);
         if ( !$activity || $activity <= 0 ) {
@@ -83,25 +92,62 @@ class CarbonFootprint extends Controller
         return $data;
     }
 
+    private function checkCarbonFootprintCache(array $data) {
+        $where = [];
+        foreach( $data as $key => $value ) {
+            if ( $value ) {
+                $where[$this->association[$key]] = $value;
+            }
+        }
+        $cache = CarbonFootprintCache::where($where)->first();
+        return $cache;
+    }
+
+    private function saveNewResponseToCache(array $data, float $result):bool {
+        $columns = [];
+        foreach( $data as $key => $value ) {
+            $columns[$this->association[$key]] = $value;
+        }
+        $columns['carbon_footprint'] = $result;
+        $carbonFootprint = CarbonFootprintCache::create($columns);
+        if ( $carbonFootprint->save() ) {
+            return true;
+        }
+        return false;
+    }
+
     public function get(Request $request) {
 
         $data = $this->validateRequestParameters($request);
+
+        if ( gettype($data) === 'object' ) {
+            return $data;
+        }
+
+        $cache = $this->checkCarbonFootprintCache($data);
+        if ( $cache ) {
+            $output = [];
+            $output['carbonFootprint'] = $cache->carbon_footprint;
+            $output['cached'] = true;
+            return response()->json($output);
+        }
 
         $carbonFootprintApiUrl = $this->buildCarbonFootprintApiUrl($data);
 
         $client = new Client();
         $response = $client->request('GET', $carbonFootprintApiUrl);
-        // $response = $client->request('GET', 'https://api.github.com/repos/guzzle/guzzle');
 
-        return response()->json(json_decode($response->getBody()));
-
-        echo $response->getStatusCode();
-        echo "<br><br>";
-        echo $response->getHeaderLine('content-type');
-        echo "<br><br>";
-        echo $response->getBody();
+        if ( (int) $response->getStatusCode() === 200 ) {
+            $responseBody = json_decode($response->getBody());
+            if ( isset($responseBody->carbonFootprint) ) {
+                $this->saveNewResponseToCache($data, (float)$responseBody->carbonFootprint);
+                $responseBody->cached = false;
+                return response()->json($responseBody, $response->getStatusCode());
+            }
+        }
         
-
+        // This will be only excuted if there is any kind of error
+        return response()->json(json_decode($response->getBody()), $response->getStatusCode());
     }
 }
 
