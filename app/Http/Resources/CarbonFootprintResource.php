@@ -34,8 +34,4 @@ class CarbonFootprintResource extends JsonResource
         return $output;
     }
 
-    public function cached($request) {
-        return [
-        ];
-    }
 }
