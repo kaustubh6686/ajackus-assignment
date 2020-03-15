@@ -20,6 +20,7 @@ class CreateCarbonFootprintCachesTable extends Migration
             $table->char('fuel_type', 30)->nullable();
             $table->char('mode', 30)->nullable();
             $table->char('country', 10);
+            $table->float('carbon_footprint', 8, 2);
             $table->timestamps();
         });
     }
